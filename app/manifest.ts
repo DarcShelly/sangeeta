@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Tabs — Guitar Chords & Playlists",
-    short_name: "Tabs",
+    name: "Sangeeta — Guitar Chords & Playlists",
+    short_name: "Sangeeta",
     description: "Your guitar tabs, chords, and playlists.",
     start_url: "/",
     display: "standalone",

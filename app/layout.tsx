@@ -17,10 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tabs",
+  title: "Sangeeta",
   description: "Your guitar tabs, chords, and playlists.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Tabs" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Sangeeta" },
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
