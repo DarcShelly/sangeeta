@@ -2,13 +2,18 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { favouriteSongs, useStore } from "@/lib/store";
 import { extractChords } from "@/lib/chordpro";
 import { extractYouTubeId, youTubeThumbnail } from "@/lib/youtube";
 import { ChordDiagram } from "@/components/ChordDiagram";
 import { TabBody } from "@/components/TabBody";
 import { MoreMenu } from "@/components/MoreMenu";
+import { MetronomeModal } from "@/components/Metronome";
+
+const MIN_SCROLL_SPEED = 1;
+const MAX_SCROLL_SPEED = 8;
+const SCROLL_INTERVAL_MS = 60;
 
 export default function SongPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,7 +21,13 @@ export default function SongPage() {
   const searchParams = useSearchParams();
   const { ready, songs, getSong, getPlaylist } = useStore();
   const [autoScroll, setAutoScroll] = useState(false);
+  const [scrollSpeed, setScrollSpeed] = useState(2);
+  const [showMetronome, setShowMetronome] = useState(false);
   const scrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scrollSpeedRef = useRef(scrollSpeed);
+  useEffect(() => {
+    scrollSpeedRef.current = scrollSpeed;
+  }, [scrollSpeed]);
 
   const playlistId = searchParams.get("pl");
   const playlist =
@@ -26,16 +37,32 @@ export default function SongPage() {
         ? getPlaylist(playlistId)
         : undefined;
 
+  const stopAutoScroll = () => {
+    if (scrollTimer.current) clearInterval(scrollTimer.current);
+    scrollTimer.current = null;
+    setAutoScroll(false);
+  };
+
   const toggleAutoScroll = () => {
     if (autoScroll) {
-      if (scrollTimer.current) clearInterval(scrollTimer.current);
-      scrollTimer.current = null;
-      setAutoScroll(false);
+      stopAutoScroll();
     } else {
-      scrollTimer.current = setInterval(() => window.scrollBy({ top: 1 }), 60);
+      scrollTimer.current = setInterval(
+        () => window.scrollBy({ top: scrollSpeedRef.current }),
+        SCROLL_INTERVAL_MS
+      );
       setAutoScroll(true);
     }
   };
+
+  // Stop scrolling when leaving this page (route change or unmount) — the
+  // interval otherwise keeps calling window.scrollBy forever, scrolling
+  // whatever page you've navigated to since.
+  useEffect(() => {
+    return () => {
+      if (scrollTimer.current) clearInterval(scrollTimer.current);
+    };
+  }, []);
 
   const goRelative = (delta: number) => {
     if (!playlist || playlist.songIds.length === 0) return;
@@ -57,32 +84,77 @@ export default function SongPage() {
 
   const chords = extractChords(song.body);
   const youTubeId = song.videoUrl ? extractYouTubeId(song.videoUrl) : null;
+  const infoBadges = [
+    song.key && { label: "Key", value: song.key },
+    song.capo ? { label: "Capo", value: String(song.capo) } : null,
+    song.bpm ? { label: "BPM", value: String(song.bpm) } : null,
+  ].filter((b): b is { label: string; value: string } => Boolean(b));
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-neutral-900 bg-neutral-950/95 px-3 py-2.5 backdrop-blur">
-        <button onClick={() => router.back()} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-neutral-800">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{song.title}</p>
-          <p className="truncate text-xs text-neutral-400">
-            {song.artist}
-            {song.key ? ` · Key ${song.key}` : ""}
-            {song.capo ? ` · Capo ${song.capo}` : ""}
-          </p>
+      <header className="sticky top-0 z-20 border-b border-neutral-900 bg-neutral-950/95 backdrop-blur">
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <button onClick={() => router.back()} aria-label="Back" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-neutral-800">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">{song.title}</p>
+            {song.artist && <p className="truncate text-xs text-neutral-400">{song.artist}</p>}
+          </div>
+          <button
+            onClick={() => setShowMetronome(true)}
+            aria-label="Metronome"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-300 hover:bg-neutral-800"
+          >
+            <MetronomeIcon />
+          </button>
+          <MoreMenu song={song} />
         </div>
-        <button
-          onClick={toggleAutoScroll}
-          className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-            autoScroll ? "bg-amber-500 text-neutral-950" : "bg-neutral-800 text-neutral-300"
-          }`}
-        >
-          {autoScroll ? "Stop" : "Autoscroll"}
-        </button>
-        <MoreMenu song={song} />
+
+        {infoBadges.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-3 pb-2.5">
+            {infoBadges.map((b) => (
+              <span
+                key={b.label}
+                className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-medium text-neutral-300"
+              >
+                <span className="text-neutral-500">{b.label}</span> {b.value}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 px-3 pb-2.5">
+          <button
+            onClick={toggleAutoScroll}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+              autoScroll ? "bg-amber-500 text-neutral-950" : "bg-neutral-800 text-neutral-300"
+            }`}
+          >
+            {autoScroll ? "Stop" : "Autoscroll"}
+          </button>
+          <div className="flex items-center gap-1 rounded-full bg-neutral-900 px-1 py-1">
+            <button
+              onClick={() => setScrollSpeed((s) => Math.max(MIN_SCROLL_SPEED, s - 1))}
+              disabled={scrollSpeed <= MIN_SCROLL_SPEED}
+              aria-label="Slower scroll"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-neutral-300 disabled:opacity-30"
+            >
+              −
+            </button>
+            <span className="w-10 text-center text-xs text-neutral-400">{scrollSpeed}x</span>
+            <button
+              onClick={() => setScrollSpeed((s) => Math.min(MAX_SCROLL_SPEED, s + 1))}
+              disabled={scrollSpeed >= MAX_SCROLL_SPEED}
+              aria-label="Faster scroll"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-neutral-300 disabled:opacity-30"
+            >
+              +
+            </button>
+          </div>
+        </div>
       </header>
 
       {chords.length > 0 && (
@@ -141,6 +213,10 @@ export default function SongPage() {
           </button>
         </div>
       )}
+
+      {showMetronome && (
+        <MetronomeModal defaultBpm={song.bpm} onClose={() => setShowMetronome(false)} />
+      )}
     </div>
   );
 }
@@ -149,6 +225,15 @@ function PlayIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function MetronomeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M8 21h8M9 21l3-15 3 15M8 10l7.5-4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none" />
     </svg>
   );
 }

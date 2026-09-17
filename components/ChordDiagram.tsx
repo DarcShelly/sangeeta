@@ -1,6 +1,6 @@
 "use client";
 
-import { findChordShape } from "@/lib/chordShapes";
+import { findChordShape, isApproximateShape } from "@/lib/chordShapes";
 
 const STRINGS = 6;
 const FRETS = 4;
@@ -13,6 +13,7 @@ const FRET_GAP = (H - TOP - 8) / FRETS;
 
 export function ChordDiagram({ name }: { name: string }) {
   const shape = findChordShape(name);
+  const approximate = isApproximateShape(name);
 
   return (
     <div className="flex w-16 flex-col items-center gap-1 shrink-0">
@@ -86,7 +87,12 @@ export function ChordDiagram({ name }: { name: string }) {
           </text>
         )}
       </svg>
-      <span className="text-xs font-semibold text-amber-400">{name}</span>
+      <span className="flex items-center gap-0.5 text-xs font-semibold text-amber-400">
+        {name}
+        {approximate && (
+          <span title="Exact voicing not in the library — showing the closest major/minor shape">~</span>
+        )}
+      </span>
     </div>
   );
 }

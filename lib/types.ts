@@ -4,6 +4,7 @@ export type Song = {
   artist: string;
   key?: string;
   capo?: number;
+  bpm?: number;
   strummingPattern?: string;
   videoUrl?: string;
   /** Normalized ChordPro-style body: chords in [Brackets] inline with lyrics, [Section] headers. */

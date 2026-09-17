@@ -74,7 +74,11 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function Line({ line }: { line: ParsedLine }) {
-  if (line.type === "blank") return <div className="h-4" />;
+  // A blank line is the source's own signal for "new phrase/stanza" — give it
+  // a clearly bigger gap than the small constant rhythm between ordinary
+  // lines, so grouping reads at a glance instead of every line looking the
+  // same distance apart regardless of whether it's mid-verse or a new one.
+  if (line.type === "blank") return <div className="h-5" />;
 
   if (line.type === "section") {
     return (
@@ -105,14 +109,19 @@ function Line({ line }: { line: ParsedLine }) {
     );
   }
 
-  const hasChords = line.segments.some((s) => s.chord);
+  // A small constant gap between every physical line (chorded or not) — tight
+  // enough that a continuous verse reads as one block, with blank source
+  // lines (above) providing the bigger gap for actual phrase/stanza breaks.
   return (
-    <div className={`whitespace-normal leading-6 ${hasChords ? "mt-3" : ""}`}>
+    <div className="mt-1 whitespace-normal font-mono leading-6">
       {line.segments.map((seg, i) => (
         // Each chord+text pair stacks and wraps as one unit, so a segment that
         // lands on a wrapped visual row still carries its own chord slot above
         // it instead of overlapping the row above it (absolute positioning only
         // reserves space on the first visual row of a line, not on wrapped ones).
+        // Chord label and lyric text share the same monospace font — mixing
+        // fonts made the chord look like it belonged to a different character
+        // position than it actually did.
         <span key={i} className="inline-flex flex-col items-start align-top">
           <span className="h-4 whitespace-nowrap text-xs font-bold leading-4 text-amber-400">
             {seg.chord || " "}

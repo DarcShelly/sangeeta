@@ -23,6 +23,8 @@ export default function ImportPage() {
       artist: meta.artist ?? "",
       key: meta.key,
       capo: meta.capo,
+      bpm: meta.bpm,
+      strummingPattern: meta.strummingPattern,
       body,
     });
   };
@@ -49,12 +51,19 @@ export default function ImportPage() {
           artist: data.artist ?? meta.artist ?? "",
           key: data.key ?? meta.key,
           capo: data.capo ?? meta.capo,
+          bpm: data.bpm ?? meta.bpm,
+          strummingPattern: data.strummingPattern ?? meta.strummingPattern,
           body,
           videoUrl: url.trim().includes("youtube") ? url.trim() : undefined,
         });
       } else {
-        // Unstructured fallback: hand it to the paste flow instead of guessing.
-        setPasteText(data.rawText ?? "");
+        // Unstructured fallback: hand it to the paste flow instead of guessing
+        // structure, but keep any tempo/strumming guess by folding it back in
+        // as directives — the Parse step below already knows how to read those.
+        const hints =
+          (data.bpm ? `{tempo: ${data.bpm}}\n` : "") +
+          (data.strummingPattern ? `{strum: ${data.strummingPattern}}\n` : "");
+        setPasteText(hints + (data.rawText ?? ""));
         setMode("paste");
         setFetchError(
           "Couldn't confidently parse that page. Dropped its text below — trim it down to the chords/lyrics and hit Parse."

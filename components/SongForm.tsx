@@ -19,6 +19,7 @@ export function SongForm({
   const [artist, setArtist] = useState(base?.artist ?? "");
   const [key, setKey] = useState(base?.key ?? "");
   const [capo, setCapo] = useState(base?.capo?.toString() ?? "");
+  const [bpm, setBpm] = useState(base?.bpm?.toString() ?? "");
   const [strummingPattern, setStrummingPattern] = useState(base?.strummingPattern ?? "");
   const [videoUrl, setVideoUrl] = useState(base?.videoUrl ?? "");
   const [body, setBody] = useState(base?.body ?? "");
@@ -34,6 +35,7 @@ export function SongForm({
       artist: artist.trim(),
       key: key.trim() || undefined,
       capo: capo.trim() ? Number(capo) : undefined,
+      bpm: bpm.trim() ? Number(bpm) : undefined,
       strummingPattern: strummingPattern.trim() || undefined,
       videoUrl: videoUrl.trim() || undefined,
       body,
@@ -80,6 +82,15 @@ export function SongForm({
               onChange={(e) => setCapo(e.target.value.replace(/[^0-9]/g, ""))}
               className={inputClass}
               placeholder="0"
+              inputMode="numeric"
+            />
+          </Field>
+          <Field label="BPM" className="flex-1">
+            <input
+              value={bpm}
+              onChange={(e) => setBpm(e.target.value.replace(/[^0-9]/g, ""))}
+              className={inputClass}
+              placeholder="90"
               inputMode="numeric"
             />
           </Field>

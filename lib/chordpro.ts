@@ -61,15 +61,19 @@ export type ExtractedMeta = {
   artist?: string;
   key?: string;
   capo?: number;
+  bpm?: number;
+  strummingPattern?: string;
   body: string;
 };
 
-/** Pull {title:}/{artist:}/{key:}/{capo:} directives (ChordPro or UG style) out of the body. */
+/** Pull {title:}/{artist:}/{key:}/{capo:}/{tempo:}/{strum:} directives (ChordPro or UG style) out of the body. */
 export function extractMetadata(raw: string): ExtractedMeta {
   let title: string | undefined;
   let artist: string | undefined;
   let key: string | undefined;
   let capo: number | undefined;
+  let bpm: number | undefined;
+  let strummingPattern: string | undefined;
 
   const body = raw
     .split("\n")
@@ -93,13 +97,21 @@ export function extractMetadata(raw: string): ExtractedMeta {
         case "capo":
           capo = Number(value) || undefined;
           return false;
+        case "tempo":
+        case "bpm":
+          bpm = Number(value.replace(/[^0-9]/g, "")) || undefined;
+          return false;
+        case "strum":
+        case "strumming":
+          strummingPattern = value;
+          return false;
         default:
           return true;
       }
     })
     .join("\n");
 
-  return { title, artist, key, capo, body };
+  return { title, artist, key, capo, bpm, strummingPattern, body };
 }
 
 /** Normalize UG ([ch]G[/ch]) or plain (chord-line-above-lyric-line) text into ChordPro-lite. */
