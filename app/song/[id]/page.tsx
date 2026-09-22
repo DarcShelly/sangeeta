@@ -11,9 +11,17 @@ import { TabBody } from "@/components/TabBody";
 import { MoreMenu } from "@/components/MoreMenu";
 import { MetronomeModal } from "@/components/Metronome";
 
-const MIN_SCROLL_SPEED = 1;
-const MAX_SCROLL_SPEED = 8;
+const MIN_SCROLL_SPEED = 0.25;
+const MAX_SCROLL_SPEED = 4;
+const SCROLL_SPEED_STEP = 0.05;
+const BASE_SCROLL_PX = 2;
 const SCROLL_INTERVAL_MS = 60;
+
+// 0.1 + 0.05 in float math is 0.15000000000000002 — snap to the step grid so
+// repeated +/- clicks land on clean values like 1.05, not 1.0500000000000003.
+function roundToStep(value: number): number {
+  return Math.round(value / SCROLL_SPEED_STEP) * SCROLL_SPEED_STEP;
+}
 
 export default function SongPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,7 +29,7 @@ export default function SongPage() {
   const searchParams = useSearchParams();
   const { ready, songs, getSong, getPlaylist } = useStore();
   const [autoScroll, setAutoScroll] = useState(false);
-  const [scrollSpeed, setScrollSpeed] = useState(2);
+  const [scrollSpeed, setScrollSpeed] = useState(1);
   const [showMetronome, setShowMetronome] = useState(false);
   const scrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollSpeedRef = useRef(scrollSpeed);
@@ -48,7 +56,7 @@ export default function SongPage() {
       stopAutoScroll();
     } else {
       scrollTimer.current = setInterval(
-        () => window.scrollBy({ top: scrollSpeedRef.current }),
+        () => window.scrollBy({ top: BASE_SCROLL_PX * scrollSpeedRef.current }),
         SCROLL_INTERVAL_MS
       );
       setAutoScroll(true);
@@ -137,16 +145,16 @@ export default function SongPage() {
           </button>
           <div className="flex items-center gap-1 rounded-full bg-neutral-900 px-1 py-1">
             <button
-              onClick={() => setScrollSpeed((s) => Math.max(MIN_SCROLL_SPEED, s - 1))}
+              onClick={() => setScrollSpeed((s) => Math.max(MIN_SCROLL_SPEED, roundToStep(s - SCROLL_SPEED_STEP)))}
               disabled={scrollSpeed <= MIN_SCROLL_SPEED}
               aria-label="Slower scroll"
               className="flex h-6 w-6 items-center justify-center rounded-full text-neutral-300 disabled:opacity-30"
             >
               −
             </button>
-            <span className="w-10 text-center text-xs text-neutral-400">{scrollSpeed}x</span>
+            <span className="w-12 text-center text-xs text-neutral-400">{scrollSpeed.toFixed(2)}x</span>
             <button
-              onClick={() => setScrollSpeed((s) => Math.min(MAX_SCROLL_SPEED, s + 1))}
+              onClick={() => setScrollSpeed((s) => Math.min(MAX_SCROLL_SPEED, roundToStep(s + SCROLL_SPEED_STEP)))}
               disabled={scrollSpeed >= MAX_SCROLL_SPEED}
               aria-label="Faster scroll"
               className="flex h-6 w-6 items-center justify-center rounded-full text-neutral-300 disabled:opacity-30"

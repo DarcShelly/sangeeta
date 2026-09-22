@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import type { NewSongInput, Song } from "@/lib/types";
+import { YouTubeSearchDialog } from "./YouTubeSearchDialog";
 
 export function SongForm({
   existing,
@@ -24,6 +25,7 @@ export function SongForm({
   const [videoUrl, setVideoUrl] = useState(base?.videoUrl ?? "");
   const [body, setBody] = useState(base?.body ?? "");
   const [saving, setSaving] = useState(false);
+  const [showYouTubeSearch, setShowYouTubeSearch] = useState(false);
 
   const canSave = title.trim().length > 0 && !saving;
 
@@ -103,13 +105,22 @@ export function SongForm({
             placeholder="D D U U D U"
           />
         </Field>
-        <Field label="Video link (YouTube or other)">
-          <input
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            className={inputClass}
-            placeholder="https://youtube.com/watch?v=..."
-          />
+        <Field label="Video">
+          <div className="flex gap-2">
+            <input
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              className={inputClass}
+              placeholder="https://youtube.com/watch?v=... (or search →)"
+            />
+            <button
+              type="button"
+              onClick={() => setShowYouTubeSearch(true)}
+              className="shrink-0 rounded-lg bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-200 hover:bg-neutral-700"
+            >
+              Search
+            </button>
+          </div>
         </Field>
         <Field label="Chords & lyrics">
           <textarea
@@ -125,6 +136,17 @@ export function SongForm({
           </p>
         </Field>
       </div>
+
+      {showYouTubeSearch && (
+        <YouTubeSearchDialog
+          initialQuery={[title, artist].filter(Boolean).join(" ")}
+          onSelect={(url) => {
+            setVideoUrl(url);
+            setShowYouTubeSearch(false);
+          }}
+          onClose={() => setShowYouTubeSearch(false)}
+        />
+      )}
     </div>
   );
 }
