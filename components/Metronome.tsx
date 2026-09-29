@@ -1,96 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Modal } from "./Modal";
-
-const MIN_BPM = 40;
-const MAX_BPM = 240;
-const LOOKAHEAD_MS = 25;
-const SCHEDULE_AHEAD_S = 0.1;
-
-type AudioContextCtor = typeof AudioContext;
+import { MAX_BPM, MIN_BPM, clampBpm } from "@/lib/useMetronome";
 
 export function MetronomeModal({
-  defaultBpm,
+  bpm,
+  setBpm,
+  running,
+  pulse,
+  toggle,
   onClose,
 }: {
-  defaultBpm?: number;
+  bpm: number;
+  setBpm: (updater: number | ((b: number) => number)) => void;
+  running: boolean;
+  pulse: boolean;
+  toggle: () => void;
   onClose: () => void;
 }) {
-  const [bpm, setBpm] = useState(clampBpm(defaultBpm ?? 90));
-  const [running, setRunning] = useState(false);
-  const [pulse, setPulse] = useState(false);
-
-  const bpmRef = useRef(bpm);
-  useEffect(() => {
-    bpmRef.current = bpm;
-  }, [bpm]);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const nextNoteTimeRef = useRef(0);
-  const beatCountRef = useRef(0);
-  const schedulerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pulseTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const scheduleClick = (time: number, accent: boolean) => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = accent ? 1400 : 1000;
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(accent ? 1 : 0.6, time + 0.001);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.03);
-
-    const delayMs = Math.max(0, (time - ctx.currentTime) * 1000);
-    pulseTimersRef.current.push(
-      setTimeout(() => {
-        setPulse(true);
-        setTimeout(() => setPulse(false), 90);
-      }, delayMs)
-    );
-  };
-
-  const runScheduler = () => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    while (nextNoteTimeRef.current < ctx.currentTime + SCHEDULE_AHEAD_S) {
-      scheduleClick(nextNoteTimeRef.current, beatCountRef.current % 4 === 0);
-      beatCountRef.current += 1;
-      nextNoteTimeRef.current += 60 / bpmRef.current;
-    }
-  };
-
-  const stop = () => {
-    if (schedulerTimerRef.current) clearInterval(schedulerTimerRef.current);
-    schedulerTimerRef.current = null;
-    pulseTimersRef.current.forEach(clearTimeout);
-    pulseTimersRef.current = [];
-    setRunning(false);
-    setPulse(false);
-  };
-
-  const start = () => {
-    const Ctor: AudioContextCtor | undefined =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
-    if (!Ctor) return;
-    if (!audioCtxRef.current) audioCtxRef.current = new Ctor();
-    audioCtxRef.current.resume();
-    beatCountRef.current = 0;
-    nextNoteTimeRef.current = audioCtxRef.current.currentTime + 0.05;
-    schedulerTimerRef.current = setInterval(runScheduler, LOOKAHEAD_MS);
-    setRunning(true);
-  };
-
-  const toggle = () => (running ? stop() : start());
-
-  useEffect(() => stop, []);
-
+  // Closing the popup only hides it — the engine (owned by the song page)
+  // keeps running until Stop is tapped or the song page itself is left.
   return (
-    <Modal onClose={() => { stop(); onClose(); }} title="Metronome">
+    <Modal onClose={onClose} title="Metronome">
       <div className="flex flex-col items-center gap-5 py-2">
         <div
           className={`flex h-16 w-16 items-center justify-center rounded-full border-2 text-lg font-bold transition-colors ${
@@ -137,9 +68,4 @@ export function MetronomeModal({
       </div>
     </Modal>
   );
-}
-
-function clampBpm(value: number): number {
-  if (Number.isNaN(value)) return MIN_BPM;
-  return Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(value)));
 }

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { favouriteSongs, useStore } from "@/lib/store";
 import { extractChords } from "@/lib/chordpro";
 import { extractYouTubeId, youTubeThumbnail } from "@/lib/youtube";
+import { useMetronome } from "@/lib/useMetronome";
 import { ChordDiagram } from "@/components/ChordDiagram";
 import { TabBody } from "@/components/TabBody";
 import { MoreMenu } from "@/components/MoreMenu";
@@ -28,9 +29,17 @@ export default function SongPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { ready, songs, getSong, getPlaylist } = useStore();
+  const song = getSong(id);
+
+  // Hooks must run unconditionally (before the not-ready/not-found early
+  // returns below), so the metronome engine — and its "only stop on Stop or
+  // leaving this page" lifetime — is anchored to the page, not to whether
+  // the song has loaded yet.
+  const metronome = useMetronome(song?.bpm);
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(1);
   const [showMetronome, setShowMetronome] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState(false);
   const scrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollSpeedRef = useRef(scrollSpeed);
   useEffect(() => {
@@ -85,7 +94,6 @@ export default function SongPage() {
     return <div className="flex min-h-full items-center justify-center text-neutral-500">Loading…</div>;
   }
 
-  const song = getSong(id);
   if (!song) {
     return <div className="flex min-h-full items-center justify-center text-neutral-500">Song not found.</div>;
   }
@@ -114,9 +122,12 @@ export default function SongPage() {
           <button
             onClick={() => setShowMetronome(true)}
             aria-label="Metronome"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-300 hover:bg-neutral-800"
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-300 hover:bg-neutral-800"
           >
             <MetronomeIcon />
+            {metronome.running && (
+              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            )}
           </button>
           <MoreMenu song={song} />
         </div>
@@ -181,29 +192,62 @@ export default function SongPage() {
       )}
 
       {song.videoUrl && (
-        <a
-          href={song.videoUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 border-b border-neutral-900 px-4 py-3 hover:bg-neutral-900"
-        >
-          {youTubeId ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={youTubeThumbnail(youTubeId)}
-              alt="Video thumbnail"
-              className="h-14 w-24 shrink-0 rounded-lg object-cover bg-neutral-800"
-            />
-          ) : (
-            <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-neutral-800 text-neutral-500">
-              <PlayIcon />
+        <div className="border-b border-neutral-900">
+          {playingVideo && youTubeId ? (
+            <div className="relative aspect-video w-full bg-black">
+              <iframe
+                src={`https://www.youtube.com/embed/${youTubeId}?autoplay=1`}
+                className="absolute inset-0 h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="YouTube video player"
+              />
+              <button
+                onClick={() => setPlayingVideo(false)}
+                aria-label="Close video"
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white"
+              >
+                ✕
+              </button>
             </div>
+          ) : youTubeId ? (
+            <button
+              onClick={() => setPlayingVideo(true)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-neutral-900"
+            >
+              <div className="relative h-14 w-24 shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={youTubeThumbnail(youTubeId)}
+                  alt="Video thumbnail"
+                  className="h-14 w-24 rounded-lg object-cover bg-neutral-800"
+                />
+                <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/30">
+                  <PlayIcon />
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">Play video</p>
+                <p className="truncate text-xs text-neutral-500">Plays here — chords stay visible</p>
+              </div>
+            </button>
+          ) : (
+            <a
+              href={song.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-900"
+            >
+              <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-neutral-800 text-neutral-500">
+                <PlayIcon />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">Watch video</p>
+                <p className="truncate text-xs text-neutral-500">{song.videoUrl}</p>
+              </div>
+            </a>
           )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">Watch video</p>
-            <p className="truncate text-xs text-neutral-500">{song.videoUrl}</p>
-          </div>
-        </a>
+        </div>
       )}
 
       <TabBody body={song.body} />
@@ -223,7 +267,14 @@ export default function SongPage() {
       )}
 
       {showMetronome && (
-        <MetronomeModal defaultBpm={song.bpm} onClose={() => setShowMetronome(false)} />
+        <MetronomeModal
+          bpm={metronome.bpm}
+          setBpm={metronome.setBpm}
+          running={metronome.running}
+          pulse={metronome.pulse}
+          toggle={metronome.toggle}
+          onClose={() => setShowMetronome(false)}
+        />
       )}
     </div>
   );
