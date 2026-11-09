@@ -5,12 +5,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { favouriteSongs, useStore } from "@/lib/store";
 import { extractChords } from "@/lib/chordpro";
-import { extractYouTubeId, youTubeThumbnail } from "@/lib/youtube";
 import { useMetronome } from "@/lib/useMetronome";
 import { ChordDiagram } from "@/components/ChordDiagram";
 import { TabBody } from "@/components/TabBody";
 import { MoreMenu } from "@/components/MoreMenu";
 import { MetronomeModal } from "@/components/Metronome";
+import { SongVideo } from "@/components/SongVideo";
 
 const MIN_SCROLL_SPEED = 0.25;
 const MAX_SCROLL_SPEED = 4;
@@ -28,7 +28,7 @@ export default function SongPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { ready, songs, getSong, getPlaylist } = useStore();
+  const { ready, songs, getSong, getPlaylist, updateSong } = useStore();
   const song = getSong(id);
 
   // Hooks must run unconditionally (before the not-ready/not-found early
@@ -39,7 +39,6 @@ export default function SongPage() {
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(1);
   const [showMetronome, setShowMetronome] = useState(false);
-  const [playingVideo, setPlayingVideo] = useState(false);
   const scrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollSpeedRef = useRef(scrollSpeed);
   useEffect(() => {
@@ -99,7 +98,6 @@ export default function SongPage() {
   }
 
   const chords = extractChords(song.body);
-  const youTubeId = song.videoUrl ? extractYouTubeId(song.videoUrl) : null;
   const infoBadges = [
     song.key && { label: "Key", value: song.key },
     song.capo ? { label: "Capo", value: String(song.capo) } : null,
@@ -191,64 +189,12 @@ export default function SongPage() {
         </div>
       )}
 
-      {song.videoUrl && (
-        <div className="border-b border-neutral-900">
-          {playingVideo && youTubeId ? (
-            <div className="relative aspect-video w-full bg-black">
-              <iframe
-                src={`https://www.youtube.com/embed/${youTubeId}?autoplay=1`}
-                className="absolute inset-0 h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                title="YouTube video player"
-              />
-              <button
-                onClick={() => setPlayingVideo(false)}
-                aria-label="Close video"
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white"
-              >
-                ✕
-              </button>
-            </div>
-          ) : youTubeId ? (
-            <button
-              onClick={() => setPlayingVideo(true)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-neutral-900"
-            >
-              <div className="relative h-14 w-24 shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={youTubeThumbnail(youTubeId)}
-                  alt="Video thumbnail"
-                  className="h-14 w-24 rounded-lg object-cover bg-neutral-800"
-                />
-                <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/30">
-                  <PlayIcon />
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">Play video</p>
-                <p className="truncate text-xs text-neutral-500">Plays here — chords stay visible</p>
-              </div>
-            </button>
-          ) : (
-            <a
-              href={song.videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-900"
-            >
-              <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-neutral-800 text-neutral-500">
-                <PlayIcon />
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">Watch video</p>
-                <p className="truncate text-xs text-neutral-500">{song.videoUrl}</p>
-              </div>
-            </a>
-          )}
-        </div>
-      )}
+      <SongVideo
+        key={song.id}
+        videoUrl={song.videoUrl}
+        searchQuery={[song.title, song.artist].filter(Boolean).join(" ")}
+        onVideoSelected={(url) => updateSong(song.id, { videoUrl: url })}
+      />
 
       <TabBody body={song.body} />
 
@@ -266,6 +212,7 @@ export default function SongPage() {
         </div>
       )}
 
+
       {showMetronome && (
         <MetronomeModal
           bpm={metronome.bpm}
@@ -280,13 +227,6 @@ export default function SongPage() {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  );
-}
 
 function MetronomeIcon() {
   return (
